@@ -1,0 +1,362 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=640, height=480, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>R36S Digital Clock</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&amp;family=Chakra+Petch:wght@500;700&amp;family=VT323&amp;display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #000000;
+      color: #00ffcc;
+      width: 640px;
+      height: 480px;
+      overflow: hidden;
+      user-select: none;
+      font-family: 'Share Tech Mono', monospace;
+    }
+    . {
+      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.4) 0%, rgba(0, 0, 0, 0.95) 100%),
+                  linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background-size: 100% 100%, 100% 4px;
+    }
+    .glow-cyan {
+      color: #00f3ff;
+      /* text-shadow: 0 0 16px rgba(0, 243, 255, 0.55), 0 0 32px rgba(0, 243, 255, 0.25); */
+    }
+    .glow-green {
+      color: #39ff14;
+      /* text-shadow: 0 0 16px rgba(57, 255, 20, 0.55), 0 0 32px rgba(57, 255, 20, 0.25); */
+    }
+    .glow-amber {
+      color: #ffb703;
+      /* text-shadow: 0 0 16px rgba(255, 183, 3, 0.55), 0 0 32px rgba(255, 183, 3, 0.25); */
+    }
+    .glow-red {
+      color: #ff3366;
+      /* text-shadow: 0 0 16px rgba(255, 51, 102, 0.55), 0 0 32px rgba(255, 51, 102, 0.25); */
+    }
+    .glow-white {
+      color: #f8fafc;
+      /* text-shadow: 0 0 16px rgba(248, 250, 252, 0.55), 0 0 32px rgba(248, 250, 252, 0.25); */
+    }
+    .glow-purple {
+      color: #d946ef;
+      /* text-shadow: 0 0 16px rgba(217, 70, 239, 0.55), 0 0 32px rgba(217, 70, 239, 0.25); */
+    }
+    .badge-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 26px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 9999px;
+      font-weight: 700;
+      font-size: 11px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 4px rgba(0, 0, 0, 0.6);
+    }
+    .btn-a { background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%); color: #ffffff; border: 1px solid #f87171; }
+    .btn-b { background: linear-gradient(180deg, #eab308 0%, #a16207 100%); color: #000000; border: 1px solid #fde047; }
+    .btn-shoulder { background: linear-gradient(180deg, #334155 0%, #1e293b 100%); color: #e2e8f0; border: 1px solid #64748b; font-family: sans-serif; letter-spacing: 0.5px; }
+    .colon-pulse {
+      animation: blink 1s steps(1) infinite;
+    }
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0.15; }
+    }
+  </style>
+</head>
+<body class="flex items-center justify-center min-h-screen bg-black">
+  <!-- Emulador da moldura R36S fixa em 640x480 pixels -->
+  <div id="screen" class="relative w-[640px] h-[480px] bg-black  border border-neutral-900 overflow-hidden flex flex-col justify-between p-4 box-border">
+    
+    <!-- Topo / Barra de Status -->
+    <header class="flex items-center justify-between px-3 py-1.5 border-b border-neutral-900/80 bg-neutral-950/70 rounded-md backdrop-blur-sm">
+      <div class="flex items-center gap-2">
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="text-xs uppercase tracking-wider text-neutral-400 font-bold">R36S OS • CLOCK</span>
+      </div>
+      
+      <!-- Indicador do Alarme Configurado -->
+      <div id="alarmStatusCard" class="flex items-center gap-2 bg-neutral-900/90 border border-neutral-800 px-2.5 py-0.5 rounded text-xs text-neutral-300">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="13" r="8"></circle>
+          <path d="M12 9v4l2 2"></path>
+          <path d="M5 3L2 6"></path>
+          <path d="M22 6l-3-3"></path>
+        </svg>
+        <span class="">ALARME: <strong id="alarmDisplay" class="text-amber-400 tracking-wider">07:00</strong></span>
+        <span id="alarmToggleIndicator" class="ml-1 text-[10px] uppercase font-bold text-emerald-400 px-1 py-0.2 bg-emerald-950/70 border border-emerald-800 rounded">ATIVO</span>
+      </div>
+
+      <div class="flex items-center gap-3 text-xs text-neutral-400 font-mono">
+        <span id="themeName" class="text-[11px] uppercase tracking-wide text-cyan-400">CYAN</span>
+        <div class="flex items-center gap-1">
+          <span class="text-[10px]">100%</span>
+          <div class="w-4 h-2 border border-neutral-600 p-[1px] rounded-xs flex items-center">
+            <div class="h-full w-full bg-emerald-500 rounded-2xs"></div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Corpo Central: Data & Horário Digital de Grande Legibilidade -->
+    <main class="flex-1 flex flex-col items-center justify-center relative py-2">
+      
+      <!-- Data e Dia da Semana -->
+      <div class="text-center mb-1">
+        <p id="dateDisplay" class="text-sm md:text-base font-bold tracking-[0.25em] text-neutral-400 uppercase">QUARTA-FEIRA, 28 OUT 2026</p>
+      </div>
+
+      <!-- Relógio Digital Principal -->
+      <div id="clockContainer" class="flex items-baseline justify-center select-none font-bold transition-all duration-300 text-cyan-400">
+        <span id="hours" class="text-[96px] leading-none tracking-tight font-mono font-black">18</span>
+        <span class="text-[84px] leading-none px-1 colon-pulse font-mono font-bold">:</span>
+        <span id="minutes" class="text-[96px] leading-none tracking-tight font-mono font-black">10</span>
+        <span class="text-[84px] leading-none px-1 colon-pulse font-mono font-bold">:</span>
+        <span id="seconds" class="text-[96px] leading-none tracking-tight font-mono font-black text-opacity-90">04</span>
+        
+        <span id="ampm" class="ml-3 text-2xl font-bold tracking-wider self-end mb-4 text-neutral-400 font-sans">
+          24H
+        </span>
+      </div>
+
+      <!-- Notificação / Mensagem de Feedback de Modo -->
+      <div id="statusToast" class="mt-2 text-xs py-1 px-3 rounded bg-neutral-900/80 border border-neutral-800 text-neutral-400 tracking-wider flex items-center gap-2 transition-opacity duration-300">
+        <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+        <span id="statusToastMsg" class="">MODO NORMAL • SELECIONE OS BOTÕES DE AÇÃO</span>
+      </div>
+
+      <!-- Modal de Edição de Alarme (Ativado por botão A) -->
+      <div id="alarmEditModal" class="hidden absolute inset-0 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center z-20 rounded-lg border border-neutral-800 p-6">
+        <div class="text-center border-b border-neutral-800 pb-3 mb-4 w-full">
+          <h2 class="text-lg font-bold text-amber-400 tracking-widest flex items-center justify-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4l2 2"></path><circle cx="12" cy="13" r="8"></circle><path d="M5 3L2 6"></path><path d="M22 6l-3-3"></path></svg>
+            EDITAR HORA DO ALARME
+          </h2>
+          <p class="text-xs text-neutral-400 mt-1">Use DPAD Cima/Baixo para ajustar e A para salvar</p>
+        </div>
+
+        <div class="flex items-center gap-4 my-4">
+          <div class="flex flex-col items-center">
+            <button onclick="adjustAlarmHour(1)" class="text-neutral-500 hover:text-amber-400 text-lg py-1 px-3">▲</button>
+            <span id="editAlarmHour" class="text-5xl font-mono font-bold text-amber-400 bg-neutral-950 px-4 py-2 border border-neutral-800 rounded">07</span>
+            <button onclick="adjustAlarmHour(-1)" class="text-neutral-500 hover:text-amber-400 text-lg py-1 px-3">▼</button>
+          </div>
+          <span class="text-4xl text-amber-400 font-bold mb-4">:</span>
+          <div class="flex flex-col items-center">
+            <button onclick="adjustAlarmMin(5)" class="text-neutral-500 hover:text-amber-400 text-lg py-1 px-3">▲</button>
+            <span id="editAlarmMin" class="text-5xl font-mono font-bold text-amber-400 bg-neutral-950 px-4 py-2 border border-neutral-800 rounded">00</span>
+            <button onclick="adjustAlarmMin(-5)" class="text-neutral-500 hover:text-amber-400 text-lg py-1 px-3">▼</button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4 mt-3">
+          <button id="btnSaveAlarm" class="px-4 py-1.5 bg-amber-500/20 text-amber-300 border border-amber-500 text-xs font-bold rounded flex items-center gap-1.5 hover:bg-amber-500/30">
+            <span class="badge-btn btn-a">A</span> SALVAR &amp; FECHAR
+          </button>
+          <button id="btnCancelAlarm" class="px-4 py-1.5 bg-neutral-900 text-neutral-400 border border-neutral-700 text-xs font-bold rounded flex items-center gap-1.5 hover:bg-neutral-800">
+            <span class="badge-btn btn-b">B</span> CANCELAR
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Rodapé: Barra de Atalhos para o Portátil R36S (640x480) -->
+    <footer class="bg-neutral-950/95 border-t border-neutral-800/90 rounded-lg p-2.5 backdrop-blur shadow-2xl">
+      <div class="grid grid-cols-3 gap-2 items-center text-xs">
+        
+        <!-- Atalho Botão A -->
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded bg-neutral-900/60 border border-neutral-800/60 hover:border-neutral-700 transition cursor-pointer" onclick="toggleEditMode()">
+          <span class="badge-btn btn-a shrink-0">A</span>
+          <div class="leading-tight overflow-hidden">
+            <div class="text-[11px] font-bold text-neutral-200 truncate">EDITAR ALARME</div>
+            <div class="text-[9px] text-neutral-400 truncate">Configurar horário</div>
+          </div>
+        </div>
+
+        <!-- Atalho Botão B -->
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded bg-neutral-900/60 border border-neutral-800/60 hover:border-neutral-700 transition cursor-pointer" onclick="toggleAlarmSnooze()">
+          <span class="badge-btn btn-b shrink-0">B</span>
+          <div class="leading-tight overflow-hidden">
+            <div class="text-[11px] font-bold text-neutral-200 truncate">SILENCIAR / MUDAR</div>
+            <div class="text-[9px] text-neutral-400 truncate">Desliga ou silencia</div>
+          </div>
+        </div>
+
+        <!-- Atalho Botões L1 e R1 -->
+        <div class="flex items-center gap-1.5 px-2 py-1.5 rounded bg-neutral-900/60 border border-neutral-800/60 hover:border-neutral-700 transition cursor-pointer" onclick="cycleTheme(1)">
+          <div class="flex items-center gap-1 shrink-0">
+            <span class="badge-btn btn-shoulder">L1</span>
+            <span class="badge-btn btn-shoulder">R1</span>
+          </div>
+          <div class="leading-tight overflow-hidden">
+            <div class="text-[11px] font-bold text-neutral-200 truncate">COR DA FONTE</div>
+            <div class="text-[9px] text-neutral-400 truncate">Alternar paleta</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Barra de Dica Discreta de Teclado (para testes no navegador ou no console) -->
+      <div class="mt-1.5 pt-1 border-t border-neutral-900/80 flex items-center justify-between text-[9px] text-neutral-400 tracking-wider">
+        <span class="">LAYOUT R36S • 640 × 480 IPS</span>
+        <span class="text-neutral-400">TECLADO: [A] Editar • [B] Silenciar • [Q/E ou ←/→] Trocar Cor</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    // Paletas de Cores Glow para o Relógio
+    const themes = [
+      { name: 'CYAN GLOW', class: 'glow-cyan', hex: '#00f3ff' },
+      { name: 'GREEN MATRIX', class: 'glow-green', hex: '#39ff14' },
+      { name: 'AMBER RETRO', class: 'glow-amber', hex: '#ffb703' },
+      { name: 'RED FLAME', class: 'glow-red', hex: '#ff3366' },
+      { name: 'CLEAN WHITE', class: 'glow-white', hex: '#f8fafc' },
+      { name: 'PURPLE NEON', class: 'glow-purple', hex: '#d946ef' }
+    ];
+    let currentThemeIdx = 0;
+
+    // Estado do alarme
+    let alarmHour = 7;
+    let alarmMinute = 0;
+    let alarmActive = true;
+    let isEditing = false;
+
+    // Elementos DOM
+    const clockEl = document.getElementById('clockContainer');
+    const themeNameEl = document.getElementById('themeName');
+    const toastMsgEl = document.getElementById('statusToastMsg');
+    const alarmDisplayEl = document.getElementById('alarmDisplay');
+    const alarmToggleIndicator = document.getElementById('alarmToggleIndicator');
+    const alarmModal = document.getElementById('alarmEditModal');
+    const editAlarmHourEl = document.getElementById('editAlarmHour');
+    const editAlarmMinEl = document.getElementById('editAlarmMin');
+
+    function updateTime() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+
+      document.getElementById('hours').textContent = h;
+      document.getElementById('minutes').textContent = m;
+      document.getElementById('seconds').textContent = s;
+
+      const dias = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
+      const meses = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+      
+      const diaSemana = dias[now.getDay()];
+      const dia = String(now.getDate()).padStart(2, '0');
+      const mes = meses[now.getMonth()];
+      const ano = now.getFullYear();
+
+      document.getElementById('dateDisplay').textContent = `${diaSemana}, ${dia} ${mes} ${ano}`;
+    }
+
+    function cycleTheme(direction = 1) {
+      clockEl.classList.remove(themes[currentThemeIdx].class);
+      currentThemeIdx = (currentThemeIdx + direction + themes.length) % themes.length;
+      const theme = themes[currentThemeIdx];
+      clockEl.classList.add(theme.class);
+      themeNameEl.textContent = theme.name;
+      themeNameEl.style.color = theme.hex;
+      
+      showToast(`COR ALTERADA: ${theme.name}`);
+    }
+
+    function toggleEditMode() {
+      isEditing = !isEditing;
+      if (isEditing) {
+        editAlarmHourEl.textContent = String(alarmHour).padStart(2, '0');
+        editAlarmMinEl.textContent = String(alarmMinute).padStart(2, '0');
+        alarmModal.classList.remove('hidden');
+        showToast('MODO DE EDIÇÃO DO ALARME ATIVADO');
+      } else {
+        alarmModal.classList.add('hidden');
+        showToast('EDIÇÃO CONCLUÍDA');
+      }
+    }
+
+    function adjustAlarmHour(delta) {
+      alarmHour = (alarmHour + delta + 24) % 24;
+      editAlarmHourEl.textContent = String(alarmHour).padStart(2, '0');
+    }
+
+    function adjustAlarmMin(delta) {
+      alarmMinute = (alarmMinute + delta + 60) % 60;
+      editAlarmMinEl.textContent = String(alarmMinute).padStart(2, '0');
+    }
+
+    function saveAlarm() {
+      alarmActive = true;
+      alarmDisplayEl.textContent = `${String(alarmHour).padStart(2, '0')}:${String(alarmMinute).padStart(2, '0')}`;
+      alarmToggleIndicator.textContent = 'ATIVO';
+      alarmToggleIndicator.className = 'ml-1 text-[10px] uppercase font-bold text-emerald-400 px-1 py-0.2 bg-emerald-950/70 border border-emerald-800 rounded';
+      toggleEditMode();
+      showToast(`ALARME DEFINIDO PARA ${alarmDisplayEl.textContent}`);
+    }
+
+    function toggleAlarmSnooze() {
+      if (isEditing) {
+        // No modo edição, botão B cancela
+        toggleEditMode();
+        return;
+      }
+      alarmActive = !alarmActive;
+      if (alarmActive) {
+        alarmToggleIndicator.textContent = 'ATIVO';
+        alarmToggleIndicator.className = 'ml-1 text-[10px] uppercase font-bold text-emerald-400 px-1 py-0.2 bg-emerald-950/70 border border-emerald-800 rounded';
+        showToast('ALARME ATIVADO');
+      } else {
+        alarmToggleIndicator.textContent = 'SILENCIADO';
+        alarmToggleIndicator.className = 'ml-1 text-[10px] uppercase font-bold text-neutral-400 px-1 py-0.2 bg-neutral-900 border border-neutral-800 rounded';
+        showToast('ALARME SILENCIADO / DESATIVADO');
+      }
+    }
+
+    function showToast(text) {
+      toastMsgEl.textContent = text;
+    }
+
+    // Ações de clique do modal
+    document.getElementById('btnSaveAlarm').onclick = saveAlarm;
+    document.getElementById('btnCancelAlarm').onclick = toggleEditMode;
+
+    // Escuta de teclas físicas mapeadas para os controles do R36S
+    window.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      if (key === 'a') {
+        if (isEditing) {
+          saveAlarm();
+        } else {
+          toggleEditMode();
+        }
+      } else if (key === 'b') {
+        toggleAlarmSnooze();
+      } else if (key === 'q' || key === 'arrowleft') {
+        cycleTheme(-1); // L1
+      } else if (key === 'e' || key === 'arrowright') {
+        cycleTheme(1);  // R1
+      } else if (isEditing && key === 'arrowup') {
+        adjustAlarmHour(1);
+      } else if (isEditing && key === 'arrowdown') {
+        adjustAlarmHour(-1);
+      }
+    });
+
+    // Início imediato do relógio
+    updateTime();
+    setInterval(updateTime, 1000);
+  </script>
+
+
+
+</body></html>
