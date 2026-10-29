@@ -1,6 +1,6 @@
 # Relógio Despertador Digital para R36S (Ports)
 
-Um relógio despertador digital com visual retrô e estética cyberpunk, desenvolvido sob medida para o console portátil **R36S** (ArkOS / AmberELEC / TheRA), reproduzindo com fidelidade o design gerado no **Google Stitch** na resolução nativa de **640x480** pixels (sem linhas CRT e com dígitos nítidos de alto contraste).
+Um relógio despertador digital com visual retrô e estética cyberpunk, desenvolvido sob medida para o console portátil **R36S** (ArkOS / AmberELEC / TheRA), na resolução nativa de **640x480** pixels.
 
 ---
 
