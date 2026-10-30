@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 R36S Digital Clock & Alarm
-Baseado no design do Google Stitch (640x480)
+Design atualizado conforme novo modelo do Google Stitch (640x480).
 Suporta Pygame e PySDL2 nativo (PortMaster) sem dependências externas no ArkOS.
 """
 
@@ -108,7 +108,7 @@ def get_battery_percentage():
 
 
 # ==============================================================================
-# MOTOR 1: PySDL2 NATIVO (O padrão do PortMaster e ArkOS no R36S)
+# MOTOR 1: PySDL2 NATIVO (Padrão do PortMaster e ArkOS no R36S)
 # ==============================================================================
 def run_pysdl2():
     import sdl2
@@ -116,7 +116,6 @@ def run_pysdl2():
     import sdl2.sdlmixer as sdlmixer
 
     print("[MOTOR] Inicializando motor PySDL2 nativo...")
-    # Se gptokeyb estiver ativo, não abrimos o Joystick nativo para evitar eventos duplicados
     gptokeyb_active = os.environ.get("GPTOKEYB_ACTIVE") == "1"
     init_flags = sdl2.SDL_INIT_VIDEO | sdl2.SDL_INIT_AUDIO
     if not gptokeyb_active:
@@ -128,7 +127,6 @@ def run_pysdl2():
 
     sdlttf.TTF_Init()
 
-    # Inicializar áudio
     has_audio = False
     alarm_chunk = None
     try:
@@ -139,7 +137,6 @@ def run_pysdl2():
     except Exception as e:
         print(f"[AUDIO] Aviso: Áudio não disponível: {e}")
 
-    # Criar Janela (Fullscreen se em console ArkOS/KMS/DRM)
     is_arkos = "ARKOS" in os.environ or os.path.exists("/dev/fb0")
     flags = sdl2.SDL_WINDOW_SHOWN
     if is_arkos:
@@ -172,19 +169,20 @@ def run_pysdl2():
         print(f"[ERRO] Falha ao criar renderer SDL: {sdl2.SDL_GetError()}")
         return False
 
-    # Carregar fontes TrueType
-    font_time = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 94)
-    font_colon = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 84)
-    font_date = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 17)
+    # Fontes com tamanhos atualizados conforme novo modelo Stitch
+    font_time = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 106)
+    font_colon = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 92)
+    font_date = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 18)
     font_header = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 13)
-    font_badge = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 12)
-    font_modal_val = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 52)
+    font_badge = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 11)
     font_toast = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 12)
-    font_card_title = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 12)
-    font_card_sub = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 10)
-    font_bottom = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 10)
+    font_modal_title = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 14)
+    font_modal_val = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 94)
+    font_modal_colon = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 64)
+    font_modal_arrow = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 14)
+    font_modal_badge = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 10)
+    font_bottom = sdlttf.TTF_OpenFont(FONT_FILE.encode("utf-8"), 13)
 
-    # Joysticks / Gamepad (somente se gptokeyb não estiver rodando)
     joysticks = []
     if not gptokeyb_active:
         for i in range(sdl2.SDL_NumJoysticks()):
@@ -198,9 +196,10 @@ def run_pysdl2():
     config = Config()
     running = True
     is_editing = False
-    edit_field = 0
+    edit_field = 0  # 0: Hora, 1: Minuto
     temp_hour = config.alarm_hour
     temp_minute = config.alarm_minute
+    temp_active = config.alarm_active
     is_alarm_ringing = False
     last_alarm_minute_triggered = -1
 
@@ -224,26 +223,34 @@ def run_pysdl2():
         show_toast(f"COR ALTERADA: {theme['name']}")
         config.save()
 
-    def toggle_edit_mode():
-        nonlocal is_editing, temp_hour, temp_minute, edit_field
-        is_editing = not is_editing
-        if is_editing:
-            temp_hour = config.alarm_hour
-            temp_minute = config.alarm_minute
-            edit_field = 0
-            show_toast("MODO DE EDIÇÃO DO ALARME ATIVADO")
-        else:
-            show_toast("EDIÇÃO CANCELADA")
+    def enter_edit_mode():
+        nonlocal is_editing, temp_hour, temp_minute, temp_active, edit_field
+        is_editing = True
+        temp_hour = config.alarm_hour
+        temp_minute = config.alarm_minute
+        temp_active = config.alarm_active
+        edit_field = 0
+        show_toast("MODO DE EDIÇÃO DO ALARME ATIVADO")
+
+    def cancel_edit_mode():
+        nonlocal is_editing
+        is_editing = False
+        show_toast("EDIÇÃO CANCELADA")
 
     def save_alarm():
         nonlocal is_editing
         config.alarm_hour = temp_hour
         config.alarm_minute = temp_minute
-        config.alarm_active = True
+        config.alarm_active = temp_active
         config.save()
         is_editing = False
         time_str = f"{config.alarm_hour:02d}:{config.alarm_minute:02d}"
-        show_toast(f"ALARME DEFINIDO PARA {time_str}")
+        status_str = "ATIVO" if config.alarm_active else "SILENCIADO"
+        show_toast(f"ALARME DEFINIDO PARA {time_str} ({status_str})")
+
+    def toggle_temp_active():
+        nonlocal temp_active
+        temp_active = not temp_active
 
     def stop_alarm():
         nonlocal is_alarm_ringing
@@ -256,13 +263,8 @@ def run_pysdl2():
         show_toast("ALARME SILENCIADO")
 
     def toggle_alarm_active():
-        nonlocal is_editing
         if is_alarm_ringing:
             stop_alarm()
-            return
-        if is_editing:
-            is_editing = False
-            show_toast("EDIÇÃO CANCELADA")
             return
         config.alarm_active = not config.alarm_active
         config.save()
@@ -286,7 +288,7 @@ def run_pysdl2():
         if edit_field == 0:
             temp_hour = (temp_hour + delta) % 24
         else:
-            temp_minute = (temp_minute + delta * 5) % 60
+            temp_minute = (temp_minute + delta) % 60
 
     # Primitivas gráficas
     def draw_fill_rect(x, y, w, h, col):
@@ -304,12 +306,6 @@ def run_pysdl2():
         if border_col:
             for b in range(border_w):
                 draw_outline_rect(x + b, y + b, w - b * 2, h - b * 2, border_col)
-
-    def draw_badge_btn(txt, center_x, center_y, bg_col, border_col, txt_col=(255, 255, 255)):
-        w, h = 26, 20
-        x, y = center_x - w // 2, center_y - h // 2
-        draw_rounded_box(x, y, w, h, bg_col, border_col, 1)
-        render_text(font_badge, txt, txt_col, center_x, center_y - 7, align="center")
 
     def render_text(font, text, color, x, y, align="left"):
         if not font or not text:
@@ -357,9 +353,15 @@ def run_pysdl2():
                     if is_editing:
                         save_alarm()
                     else:
-                        toggle_edit_mode()
+                        enter_edit_mode()
                 elif sym == sdl2.SDLK_b and not is_repeat:
-                    toggle_alarm_active()
+                    if is_editing:
+                        cancel_edit_mode()
+                    else:
+                        toggle_alarm_active()
+                elif sym in (sdl2.SDLK_x, sdl2.SDLK_y) and not is_repeat:
+                    if is_editing:
+                        toggle_temp_active()
                 elif sym in (sdl2.SDLK_q, sdl2.SDLK_PAGEUP) and not is_repeat:
                     cycle_theme(-1)
                 elif sym in (sdl2.SDLK_e, sdl2.SDLK_PAGEDOWN) and not is_repeat:
@@ -371,22 +373,27 @@ def run_pysdl2():
                     if is_editing:
                         adjust_edit_value(-1)
                 elif sym in (sdl2.SDLK_LEFT, sdl2.SDLK_RIGHT, sdl2.SDLK_TAB) and not is_repeat:
-                    # Esquerda/Direita apenas alternam entre Hora e Minuto no modo de edição
                     if is_editing:
                         edit_field = 1 - edit_field
 
             elif not gptokeyb_active and event.type == sdl2.SDL_JOYBUTTONDOWN:
                 btn = event.jbutton.button
                 # Mapeamento GO-Super Gamepad (R36S):
-                # b1 = A (Leste), b0 = B (Sul), b4 = L1, b5 = R1
+                # b1 = A, b0 = B, b2 = X, b3 = Y, b4 = L1, b5 = R1
                 # b8 = Up, b9 = Down, b10 = Left, b11 = Right, b12 = Select, b13 = Start
                 if btn == 1:  # Botão físico A
                     if is_editing:
                         save_alarm()
                     else:
-                        toggle_edit_mode()
+                        enter_edit_mode()
                 elif btn == 0:  # Botão físico B
-                    toggle_alarm_active()
+                    if is_editing:
+                        cancel_edit_mode()
+                    else:
+                        toggle_alarm_active()
+                elif btn in (2, 3):  # Botões X e Y
+                    if is_editing:
+                        toggle_temp_active()
                 elif btn == 4:  # L1
                     cycle_theme(-1)
                 elif btn == 5:  # R1
@@ -456,154 +463,189 @@ def run_pysdl2():
             battery_pct = get_battery_percentage()
             last_battery_check = time.time()
 
-        # Fundo Preto Puro e Limpo
+        # Fundo Preto Puro e Nítido
         sdl2.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255)
         sdl2.SDL_RenderClear(renderer)
 
-        # 1. HEADER
-        draw_rounded_box(12, 10, 616, 36, (13, 15, 18), (30, 36, 44), 1)
-        dot_pulse = (int(time.time() * 2) % 2 == 0)
-        dot_col = (16, 185, 129) if dot_pulse else (5, 120, 85)
-        draw_fill_rect(26, 26, 8, 8, dot_col)
-        render_text(font_header, "R36S OS • CLOCK", (156, 163, 175), 40, 21)
+        if not is_editing:
+            # ==================================================================
+            # TELA 1: RELÓGIO PRINCIPAL (Design Atualizado Stitch)
+            # ==================================================================
 
-        # Card Alarme
-        if is_alarm_ringing and (int(time.time() * 4) % 2 == 0):
-            draw_rounded_box(210, 15, 220, 26, (153, 27, 27), (239, 68, 68), 1)
+            # 1. HEADER (Lado esquerdo limpo, Centro: Alarme, Direita: Bateria)
+            draw_rounded_box(12, 10, 616, 36, (13, 15, 18), (30, 36, 44), 1)
+
+            # Card Alarme Centralizado
+            alarm_card_w = 230
+            alarm_card_x = (SCREEN_WIDTH - alarm_card_w) // 2
+            if is_alarm_ringing and (int(time.time() * 4) % 2 == 0):
+                draw_rounded_box(alarm_card_x, 15, alarm_card_w, 26, (153, 27, 27), (239, 68, 68), 1)
+            else:
+                draw_rounded_box(alarm_card_x, 15, alarm_card_w, 26, (23, 23, 23), (38, 38, 38), 1)
+
+            # Ícone do despertador
+            draw_outline_rect(alarm_card_x + 10, 21, 12, 12, (251, 191, 36))
+            draw_fill_rect(alarm_card_x + 15, 23, 2, 4, (251, 191, 36))
+            draw_fill_rect(alarm_card_x + 15, 27, 4, 2, (251, 191, 36))
+
+            render_text(font_header, "ALARME:", (209, 213, 219), alarm_card_x + 28, 21)
+            time_str = f"{config.alarm_hour:02d}:{config.alarm_minute:02d}"
+            render_text(font_header, time_str, (251, 191, 36), alarm_card_x + 84, 21)
+
+            badge_txt = "ATIVO" if config.alarm_active else "SILENCIADO"
+            badge_bg = (6, 78, 59) if config.alarm_active else (38, 38, 38)
+            badge_border = (6, 95, 70) if config.alarm_active else (64, 64, 64)
+            badge_fg = (52, 211, 153) if config.alarm_active else (156, 163, 175)
+            bw = get_text_width(font_badge, badge_txt) + 12
+            draw_rounded_box(alarm_card_x + 138, 18, bw, 20, badge_bg, badge_border, 1)
+            render_text(font_badge, badge_txt, badge_fg, alarm_card_x + 144, 22)
+
+            # Bateria à Direita
+            render_text(font_header, f"{battery_pct}%", (156, 163, 175), 570, 21)
+            draw_outline_rect(606, 23, 18, 10, (100, 116, 139))
+            draw_fill_rect(624, 26, 2, 4, (100, 116, 139))
+            charge_w = max(1, int(16 * (battery_pct / 100.0)))
+            charge_col = (16, 185, 129) if battery_pct > 20 else (239, 68, 68)
+            draw_fill_rect(607, 24, charge_w, 8, charge_col)
+
+            # 2. DATA E DIA DA SEMANA
+            dia_semana = DIAS_SEMANA[now.weekday()]
+            date_str = f"{dia_semana}, {now.day:02d} {MESES[now.month - 1]} {now.year}"
+            render_text(font_date, date_str, (156, 163, 175), SCREEN_WIDTH // 2, 110, align="center")
+
+            # 3. DÍGITOS DO RELÓGIO (Fonte Aumentada 106px / 92px, sem 24H)
+            h_str = f"{now.hour:02d}"
+            m_str = f"{now.minute:02d}"
+            s_str = f"{now.second:02d}"
+            colon_char = ":" if (int(time.time() * 2) % 2 == 0) else " "
+
+            hw = get_text_width(font_time, h_str)
+            cw = get_text_width(font_colon, ":")
+            mw = get_text_width(font_time, m_str)
+            sw = get_text_width(font_time, s_str)
+            total_w = hw + cw + mw + cw + sw + 20
+            start_x = (SCREEN_WIDTH - total_w) // 2
+            base_y = 158
+
+            render_text(font_time, h_str, theme_col, start_x, base_y)
+            cur_x = start_x + hw + 4
+            render_text(font_colon, colon_char, theme_col, cur_x, base_y + 4)
+            cur_x += cw + 4
+            render_text(font_time, m_str, theme_col, cur_x, base_y)
+            cur_x += mw + 4
+            render_text(font_colon, colon_char, theme_col, cur_x, base_y + 4)
+            cur_x += cw + 4
+            render_text(font_time, s_str, theme_col, cur_x, base_y)
+
+            # 4. TOAST / STATUS
+            t_msg = toast_msg if time.time() <= toast_timer else "MODO NORMAL • SELECIONE OS BOTÕES DE AÇÃO"
+            tw = get_text_width(font_toast, t_msg) + 30
+            tx = (SCREEN_WIDTH - tw) // 2
+            draw_rounded_box(tx, 305, tw, 24, (20, 22, 25), (38, 45, 56), 1)
+            draw_fill_rect(tx + 10, 314, 6, 6, theme_col)
+            render_text(font_toast, t_msg, (209, 213, 219), tx + 22, 310)
+
+            # 5. RODAPÉ LIMPO E CENTRALIZADO (Cards removidos)
+            draw_rounded_box(12, 412, 616, 56, (10, 12, 15), (30, 36, 44), 1)
+            tip_txt = "TECLAS: [A] Editar • [B] Silenciar • [L1/R1] Trocar Cor • [SELECT+START] Sair"
+            render_text(font_bottom, tip_txt, (203, 213, 225), SCREEN_WIDTH // 2, 431, align="center")
+
         else:
-            draw_rounded_box(210, 15, 220, 26, (23, 23, 23), (38, 38, 38), 1)
+            # ==================================================================
+            # TELA 2: AJUSTE DE ALARME (Nova Tela Dedicada do Stitch)
+            # ==================================================================
 
-        draw_fill_rect(220, 25, 6, 6, (251, 191, 36))
-        render_text(font_header, "ALARME:", (209, 213, 219), 232, 21)
-        time_str = f"{config.alarm_hour:02d}:{config.alarm_minute:02d}"
-        render_text(font_header, time_str, (251, 191, 36), 288, 21)
+            # 1. HEADER
+            draw_rounded_box(12, 10, 616, 36, (13, 15, 18), (30, 36, 44), 1)
+            render_text(font_header, f"{battery_pct}%", (156, 163, 175), 570, 21)
+            draw_outline_rect(606, 23, 18, 10, (100, 116, 139))
+            draw_fill_rect(624, 26, 2, 4, (100, 116, 139))
+            charge_w = max(1, int(16 * (battery_pct / 100.0)))
+            charge_col = (16, 185, 129) if battery_pct > 20 else (239, 68, 68)
+            draw_fill_rect(607, 24, charge_w, 8, charge_col)
 
-        badge_txt = "ATIVO" if config.alarm_active else "SILENCIADO"
-        badge_bg = (6, 78, 59) if config.alarm_active else (38, 38, 38)
-        badge_border = (6, 95, 70) if config.alarm_active else (64, 64, 64)
-        badge_fg = (52, 211, 153) if config.alarm_active else (156, 163, 175)
-        bw = get_text_width(font_badge, badge_txt) + 12
-        draw_rounded_box(336, 18, bw, 20, badge_bg, badge_border, 1)
-        render_text(font_badge, badge_txt, badge_fg, 342, 21)
+            # 2. TÍTULO
+            render_text(font_modal_title, "DEFINIR HORÁRIO DE ALARME", (156, 163, 175), SCREEN_WIDTH // 2, 70, align="center")
 
-        render_text(font_header, theme["name"], theme_col, 490, 21)
-        render_text(font_header, f"{battery_pct}%", (156, 163, 175), 570, 21)
-        draw_outline_rect(606, 23, 18, 10, (100, 116, 139))
-        draw_fill_rect(624, 26, 2, 4, (100, 116, 139))
-        charge_w = max(1, int(16 * (battery_pct / 100.0)))
-        charge_col = (16, 185, 129) if battery_pct > 20 else (239, 68, 68)
-        draw_fill_rect(607, 24, charge_w, 8, charge_col)
+            # 3. CAMPOS DE HORA E MINUTO (Dígitos 94px)
+            box_w, box_h = 150, 138
 
-        # 2. DATA E RELÓGIO DIGITAL
-        dia_semana = DIAS_SEMANA[now.weekday()]
-        date_str = f"{dia_semana}, {now.day:02d} {MESES[now.month - 1]} {now.year}"
-        render_text(font_date, date_str, (156, 163, 175), SCREEN_WIDTH // 2, 105, align="center")
+            # --- CAMPO HORA ---
+            h_is_sel = (edit_field == 0)
+            h_arr_col = (251, 191, 36) if h_is_sel else (82, 82, 82)
+            render_text(font_modal_arrow, "▲ +1H", h_arr_col, SCREEN_WIDTH // 2 - 110, 104, align="center")
 
-        h_str = f"{now.hour:02d}"
-        m_str = f"{now.minute:02d}"
-        s_str = f"{now.second:02d}"
-        colon_char = ":" if (int(time.time() * 2) % 2 == 0) else " "
+            hx = SCREEN_WIDTH // 2 - 185
+            hy = 126
+            h_bg = (10, 10, 10) if h_is_sel else (13, 15, 18)
+            h_border = (251, 191, 36) if h_is_sel else (38, 38, 38)
+            draw_rounded_box(hx, hy, box_w, box_h, h_bg, h_border, 2 if h_is_sel else 1)
 
-        hw = get_text_width(font_time, h_str)
-        cw = get_text_width(font_colon, ":")
-        mw = get_text_width(font_time, m_str)
-        sw = get_text_width(font_time, s_str)
-        aw = get_text_width(font_date, "24H")
-        total_w = hw + cw + mw + cw + sw + aw + 24
-        start_x = (SCREEN_WIDTH - total_w) // 2
-        base_y = 145
+            h_val_col = (251, 191, 36) if h_is_sel else (163, 163, 163)
+            render_text(font_modal_val, f"{temp_hour:02d}", h_val_col, SCREEN_WIDTH // 2 - 110, 134, align="center")
 
-        render_text(font_time, h_str, theme_col, start_x, base_y)
-        cur_x = start_x + hw + 4
-        render_text(font_colon, colon_char, theme_col, cur_x, base_y + 4)
-        cur_x += cw + 4
-        render_text(font_time, m_str, theme_col, cur_x, base_y)
-        cur_x += mw + 4
-        render_text(font_colon, colon_char, theme_col, cur_x, base_y + 4)
-        cur_x += cw + 4
-        render_text(font_time, s_str, theme_col, cur_x, base_y)
-        cur_x += sw + 10
-        render_text(font_date, "24H", (156, 163, 175), cur_x, base_y + 60)
+            if h_is_sel:
+                draw_rounded_box(SCREEN_WIDTH // 2 - 170, 238, 120, 18, (69, 26, 3), (120, 53, 15), 1)
+                render_text(font_modal_badge, "HORA [SELECIONADO]", (253, 230, 138), SCREEN_WIDTH // 2 - 110, 241, align="center")
+            else:
+                render_text(font_modal_badge, "HORA", (115, 115, 115), SCREEN_WIDTH // 2 - 110, 241, align="center")
 
-        # Toast
-        t_msg = toast_msg if time.time() <= toast_timer else "MODO NORMAL • SELECIONE OS BOTÕES DE AÇÃO"
-        tw = get_text_width(font_toast, t_msg) + 30
-        tx = (SCREEN_WIDTH - tw) // 2
-        draw_rounded_box(tx, 275, tw, 24, (20, 22, 25), (38, 45, 56), 1)
-        draw_fill_rect(tx + 10, 284, 6, 6, theme_col)
-        render_text(font_toast, t_msg, (209, 213, 219), tx + 22, 280)
+            render_text(font_modal_arrow, "▼ -1H", h_arr_col, SCREEN_WIDTH // 2 - 110, 272, align="center")
 
-        # 3. MODAL DE EDIÇÃO
-        if is_editing:
-            draw_fill_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (0, 0, 0, 210))
-            modal_w, modal_h = 470, 260
-            mx = (SCREEN_WIDTH - modal_w) // 2
-            my = (SCREEN_HEIGHT - modal_h) // 2 - 10
-            draw_rounded_box(mx, my, modal_w, modal_h, (10, 12, 16), (45, 55, 72), 2)
+            # --- DOIS PONTOS ---
+            render_text(font_modal_colon, ":", (115, 115, 115), SCREEN_WIDTH // 2, 162, align="center")
 
-            render_text(font_card_title, "EDITAR HORA DO ALARME", (251, 191, 36), SCREEN_WIDTH // 2, my + 14, align="center")
-            render_text(font_bottom, "Use DPAD Cima/Baixo para ajustar, Esquerda/Direita para alternar, A para salvar", (156, 163, 175), SCREEN_WIDTH // 2, my + 34, align="center")
-            draw_fill_rect(mx + 15, my + 48, modal_w - 30, 1, (38, 45, 56))
+            # --- CAMPO MINUTO ---
+            m_is_sel = (edit_field == 1)
+            m_arr_col = (251, 191, 36) if m_is_sel else (82, 82, 82)
+            render_text(font_modal_arrow, "▲ +1M", m_arr_col, SCREEN_WIDTH // 2 + 110, 104, align="center")
 
-            cy = my + 115
-            bw, bh = 84, 60
-            # Hora
-            hx = SCREEN_WIDTH // 2 - 95
-            h_border = (251, 191, 36) if edit_field == 0 else (55, 65, 81)
-            h_bg = (23, 23, 23) if edit_field == 0 else (15, 17, 21)
-            draw_rounded_box(hx, cy - bh // 2, bw, bh, h_bg, h_border, 2 if edit_field == 0 else 1)
-            render_text(font_card_title, "▲", h_border, hx + bw // 2, cy - bh // 2 - 16, align="center")
-            render_text(font_modal_val, f"{temp_hour:02d}", (251, 191, 36), hx + bw // 2, cy - 26, align="center")
-            render_text(font_card_title, "▼", h_border, hx + bw // 2, cy + bh // 2 + 4, align="center")
+            mx = SCREEN_WIDTH // 2 + 35
+            my = 126
+            m_bg = (10, 10, 10) if m_is_sel else (13, 15, 18)
+            m_border = (251, 191, 36) if m_is_sel else (38, 38, 38)
+            draw_rounded_box(mx, my, box_w, box_h, m_bg, m_border, 2 if m_is_sel else 1)
 
-            render_text(font_modal_val, ":", (251, 191, 36), SCREEN_WIDTH // 2, cy - 26, align="center")
+            m_val_col = (251, 191, 36) if m_is_sel else (163, 163, 163)
+            render_text(font_modal_val, f"{temp_minute:02d}", m_val_col, SCREEN_WIDTH // 2 + 110, 134, align="center")
 
-            # Minuto
-            mx_box = SCREEN_WIDTH // 2 + 11
-            m_border = (251, 191, 36) if edit_field == 1 else (55, 65, 81)
-            m_bg = (23, 23, 23) if edit_field == 1 else (15, 17, 21)
-            draw_rounded_box(mx_box, cy - bh // 2, bw, bh, m_bg, m_border, 2 if edit_field == 1 else 1)
-            render_text(font_card_title, "▲", m_border, mx_box + bw // 2, cy - bh // 2 - 16, align="center")
-            render_text(font_modal_val, f"{temp_minute:02d}", (251, 191, 36), mx_box + bw // 2, cy - 26, align="center")
-            render_text(font_card_title, "▼", m_border, mx_box + bw // 2, cy + bh // 2 + 4, align="center")
+            if m_is_sel:
+                draw_rounded_box(SCREEN_WIDTH // 2 + 45, 238, 130, 18, (69, 26, 3), (120, 53, 15), 1)
+                render_text(font_modal_badge, "MINUTO [SELECIONADO]", (253, 230, 138), SCREEN_WIDTH // 2 + 110, 241, align="center")
+            else:
+                render_text(font_modal_badge, "MINUTO", (115, 115, 115), SCREEN_WIDTH // 2 + 110, 241, align="center")
 
-            # Botões do Modal
-            b1_x = SCREEN_WIDTH // 2 - 165
-            draw_rounded_box(b1_x, my + modal_h - 45, 155, 30, (35, 25, 10), (245, 158, 11), 1)
-            draw_badge_btn("A", b1_x + 18, my + modal_h - 30, (185, 28, 28), (248, 113, 113))
-            render_text(font_card_title, "SALVAR & FECHAR", (253, 230, 138), b1_x + 36, my + modal_h - 37)
+            render_text(font_modal_arrow, "▼ -1M", m_arr_col, SCREEN_WIDTH // 2 + 110, 272, align="center")
 
-            b2_x = SCREEN_WIDTH // 2 + 10
-            draw_rounded_box(b2_x, my + modal_h - 45, 155, 30, (23, 23, 23), (75, 85, 99), 1)
-            draw_badge_btn("B", b2_x + 18, my + modal_h - 30, (161, 98, 7), (253, 224, 71), (0, 0, 0))
-            render_text(font_card_title, "CANCELAR", (156, 163, 175), b2_x + 38, my + modal_h - 37)
+            # 4. CARD STATUS DO ALARME
+            status_box_w = 430
+            status_box_x = (SCREEN_WIDTH - status_box_w) // 2
+            draw_rounded_box(status_box_x, 316, status_box_w, 42, (20, 23, 28), (38, 45, 56), 1)
+            render_text(font_badge, "STATUS DO ALARME:", (212, 212, 212), status_box_x + 16, 330)
 
-        # 4. RODAPÉ
-        draw_rounded_box(12, 385, 616, 85, (10, 12, 15), (30, 36, 44), 1)
-        col_w = 196
-        # Card A
-        draw_rounded_box(20, 393, col_w, 46, (20, 22, 26), (38, 45, 56), 1)
-        draw_badge_btn("A", 42, 416, (185, 28, 28), (248, 113, 113))
-        render_text(font_card_title, "EDITAR ALARME", (229, 231, 235), 62, 401)
-        render_text(font_card_sub, "Configurar horário", (156, 163, 175), 62, 417)
+            # Badge ATIVO
+            act_bg = (6, 78, 59) if temp_active else (23, 23, 23)
+            act_border = (16, 185, 129) if temp_active else (38, 38, 38)
+            act_fg = (52, 211, 153) if temp_active else (82, 82, 82)
+            draw_rounded_box(status_box_x + 165, 324, 70, 26, act_bg, act_border, 1)
+            if temp_active:
+                draw_fill_rect(status_box_x + 173, 334, 6, 6, (52, 211, 153))
+                render_text(font_badge, "ATIVO", act_fg, status_box_x + 185, 330)
+            else:
+                render_text(font_badge, "ATIVO", act_fg, status_box_x + 180, 330)
 
-        # Card B
-        draw_rounded_box(224, 393, col_w, 46, (20, 22, 26), (38, 45, 56), 1)
-        draw_badge_btn("B", 246, 416, (161, 98, 7), (253, 224, 71), (0, 0, 0))
-        render_text(font_card_title, "SILENCIAR / MUDAR", (229, 231, 235), 266, 401)
-        render_text(font_card_sub, "Desliga ou silencia", (156, 163, 175), 266, 417)
+            # Badge INATIVO
+            inact_bg = (38, 38, 38) if not temp_active else (23, 23, 23)
+            inact_border = (82, 82, 82) if not temp_active else (38, 38, 38)
+            inact_fg = (212, 212, 212) if not temp_active else (82, 82, 82)
+            draw_rounded_box(status_box_x + 242, 324, 75, 26, inact_bg, inact_border, 1)
+            render_text(font_badge, "INATIVO", inact_fg, status_box_x + 256, 330)
 
-        # Card L1/R1
-        draw_rounded_box(428, 393, col_w, 46, (20, 22, 26), (38, 45, 56), 1)
-        draw_badge_btn("L1", 446, 416, (51, 65, 85), (100, 116, 139))
-        draw_badge_btn("R1", 474, 416, (51, 65, 85), (100, 116, 139))
-        render_text(font_card_title, "COR DA FONTE", (229, 231, 235), 496, 401)
-        render_text(font_card_sub, "Alternar paleta", (156, 163, 175), 496, 417)
+            render_text(font_badge, "[X / Y: Alternar]", (115, 115, 115), status_box_x + 325, 330)
 
-        draw_fill_rect(22, 445, 596, 1, (28, 32, 40))
-        render_text(font_bottom, "LAYOUT R36S • 640 × 480 IPS", (100, 116, 139), 24, 452)
-        tip_txt = "[A] Editar • [B] Silenciar • [L1/R1] Trocar Cor • [SELECT+START] Sair"
-        render_text(font_bottom, tip_txt, (148, 163, 184), 616, 452, align="right")
+            # 5. RODAPÉ DO MODO DE AJUSTE
+            draw_rounded_box(12, 412, 616, 56, (10, 12, 15), (30, 36, 44), 1)
+            render_text(font_bottom, "TECLAS: [D-PAD] Ajustar / Navegar • [A] Confirmar • [B] Cancelar", (203, 213, 225), SCREEN_WIDTH // 2, 431, align="center")
 
         sdl2.SDL_RenderPresent(renderer)
         sdl2.SDL_Delay(33)
@@ -645,27 +687,31 @@ def run_pygame():
     config = Config()
 
     if os.path.exists(FONT_FILE):
-        f_time = pygame.font.Font(FONT_FILE, 94)
-        f_colon = pygame.font.Font(FONT_FILE, 84)
-        f_date = pygame.font.Font(FONT_FILE, 17)
+        f_time = pygame.font.Font(FONT_FILE, 106)
+        f_colon = pygame.font.Font(FONT_FILE, 92)
+        f_date = pygame.font.Font(FONT_FILE, 18)
         f_header = pygame.font.Font(FONT_FILE, 13)
-        f_badge = pygame.font.Font(FONT_FILE, 12)
-        f_modal_val = pygame.font.Font(FONT_FILE, 52)
+        f_badge = pygame.font.Font(FONT_FILE, 11)
         f_toast = pygame.font.Font(FONT_FILE, 12)
-        f_card_t = pygame.font.Font(FONT_FILE, 12)
-        f_card_s = pygame.font.Font(FONT_FILE, 10)
-        f_bottom = pygame.font.Font(FONT_FILE, 10)
+        f_modal_title = pygame.font.Font(FONT_FILE, 14)
+        f_modal_val = pygame.font.Font(FONT_FILE, 94)
+        f_modal_colon = pygame.font.Font(FONT_FILE, 64)
+        f_modal_arrow = pygame.font.Font(FONT_FILE, 14)
+        f_modal_badge = pygame.font.Font(FONT_FILE, 10)
+        f_bottom = pygame.font.Font(FONT_FILE, 13)
     else:
-        f_time = pygame.font.SysFont("monospace", 88, bold=True)
-        f_colon = pygame.font.SysFont("monospace", 80, bold=True)
-        f_date = pygame.font.SysFont("monospace", 16, bold=True)
+        f_time = pygame.font.SysFont("monospace", 100, bold=True)
+        f_colon = pygame.font.SysFont("monospace", 88, bold=True)
+        f_date = pygame.font.SysFont("monospace", 18, bold=True)
         f_header = pygame.font.SysFont("sans-serif", 13, bold=True)
-        f_badge = pygame.font.SysFont("sans-serif", 12, bold=True)
-        f_modal_val = pygame.font.SysFont("monospace", 50, bold=True)
+        f_badge = pygame.font.SysFont("sans-serif", 11, bold=True)
         f_toast = pygame.font.SysFont("monospace", 12)
-        f_card_t = pygame.font.SysFont("sans-serif", 12, bold=True)
-        f_card_s = pygame.font.SysFont("sans-serif", 10)
-        f_bottom = pygame.font.SysFont("sans-serif", 10)
+        f_modal_title = pygame.font.SysFont("sans-serif", 14, bold=True)
+        f_modal_val = pygame.font.SysFont("monospace", 90, bold=True)
+        f_modal_colon = pygame.font.SysFont("monospace", 60, bold=True)
+        f_modal_arrow = pygame.font.Font(None, 14)
+        f_modal_badge = pygame.font.SysFont("sans-serif", 10, bold=True)
+        f_bottom = pygame.font.SysFont("sans-serif", 13)
 
     alarm_sound = None
     if os.path.exists(ALARM_SOUND_FILE):
@@ -686,6 +732,7 @@ def run_pygame():
     edit_field = 0
     temp_hour = config.alarm_hour
     temp_minute = config.alarm_minute
+    temp_active = config.alarm_active
     is_alarm_ringing = False
     last_alarm_minute_triggered = -1
 
@@ -709,26 +756,34 @@ def run_pygame():
         show_toast(f"COR ALTERADA: {theme['name']}")
         config.save()
 
-    def toggle_edit_mode():
-        nonlocal is_editing, temp_hour, temp_minute, edit_field
-        is_editing = not is_editing
-        if is_editing:
-            temp_hour = config.alarm_hour
-            temp_minute = config.alarm_minute
-            edit_field = 0
-            show_toast("MODO DE EDIÇÃO DO ALARME ATIVADO")
-        else:
-            show_toast("EDIÇÃO CANCELADA")
+    def enter_edit_mode():
+        nonlocal is_editing, temp_hour, temp_minute, temp_active, edit_field
+        is_editing = True
+        temp_hour = config.alarm_hour
+        temp_minute = config.alarm_minute
+        temp_active = config.alarm_active
+        edit_field = 0
+        show_toast("MODO DE EDIÇÃO DO ALARME ATIVADO")
+
+    def cancel_edit_mode():
+        nonlocal is_editing
+        is_editing = False
+        show_toast("EDIÇÃO CANCELADA")
 
     def save_alarm():
         nonlocal is_editing
         config.alarm_hour = temp_hour
         config.alarm_minute = temp_minute
-        config.alarm_active = True
+        config.alarm_active = temp_active
         config.save()
         is_editing = False
         time_str = f"{config.alarm_hour:02d}:{config.alarm_minute:02d}"
-        show_toast(f"ALARME DEFINIDO PARA {time_str}")
+        status_str = "ATIVO" if config.alarm_active else "SILENCIADO"
+        show_toast(f"ALARME DEFINIDO PARA {time_str} ({status_str})")
+
+    def toggle_temp_active():
+        nonlocal temp_active
+        temp_active = not temp_active
 
     def stop_alarm():
         nonlocal is_alarm_ringing
@@ -741,13 +796,8 @@ def run_pygame():
         show_toast("ALARME SILENCIADO")
 
     def toggle_alarm_active():
-        nonlocal is_editing
         if is_alarm_ringing:
             stop_alarm()
-            return
-        if is_editing:
-            is_editing = False
-            show_toast("EDIÇÃO CANCELADA")
             return
         config.alarm_active = not config.alarm_active
         config.save()
@@ -771,19 +821,12 @@ def run_pygame():
         if edit_field == 0:
             temp_hour = (temp_hour + delta) % 24
         else:
-            temp_minute = (temp_minute + delta * 5) % 60
+            temp_minute = (temp_minute + delta) % 60
 
     def draw_rounded_rect(surf, col, rect, radius=6, border_col=None, border_w=1):
         pygame.draw.rect(surf, col, rect, border_radius=radius)
         if border_col and border_w > 0:
             pygame.draw.rect(surf, border_col, rect, width=border_w, border_radius=radius)
-
-    def draw_badge_btn(surf, text, center_x, center_y, bg_col, border_col, txt_col=(255, 255, 255)):
-        w, h = 26, 20
-        rect = pygame.Rect(center_x - w // 2, center_y - h // 2, w, h)
-        draw_rounded_rect(surf, bg_col, rect, radius=10, border_col=border_col, border_w=1)
-        txt = f_badge.render(text, True, txt_col)
-        surf.blit(txt, txt.get_rect(center=rect.center))
 
     while running:
         for event in pygame.event.get():
@@ -796,9 +839,15 @@ def run_pygame():
                     if is_editing:
                         save_alarm()
                     else:
-                        toggle_edit_mode()
+                        enter_edit_mode()
                 elif event.key == pygame.K_b:
-                    toggle_alarm_active()
+                    if is_editing:
+                        cancel_edit_mode()
+                    else:
+                        toggle_alarm_active()
+                elif event.key in (pygame.K_x, pygame.K_y):
+                    if is_editing:
+                        toggle_temp_active()
                 elif event.key in (pygame.K_q, pygame.K_PAGEUP):
                     cycle_theme(-1)
                 elif event.key in (pygame.K_e, pygame.K_PAGEDOWN):
@@ -819,9 +868,15 @@ def run_pygame():
                     if is_editing:
                         save_alarm()
                     else:
-                        toggle_edit_mode()
+                        enter_edit_mode()
                 elif btn == 0:
-                    toggle_alarm_active()
+                    if is_editing:
+                        cancel_edit_mode()
+                    else:
+                        toggle_alarm_active()
+                elif btn in (2, 3):
+                    if is_editing:
+                        toggle_temp_active()
                 elif btn == 4:
                     cycle_theme(-1)
                 elif btn == 5:
@@ -892,175 +947,186 @@ def run_pygame():
 
         screen.fill((0, 0, 0))
 
-        # 1. HEADER
-        header_rect = pygame.Rect(12, 10, 616, 36)
-        draw_rounded_rect(screen, (13, 15, 18), header_rect, radius=6, border_col=(30, 36, 44), border_w=1)
-        dot_pulse = (int(time.time() * 2) % 2 == 0)
-        dot_col = (16, 185, 129) if dot_pulse else (5, 120, 85)
-        pygame.draw.circle(screen, dot_col, (28, 28), 4)
-        t_title = f_header.render("R36S OS • CLOCK", True, (156, 163, 175))
-        screen.blit(t_title, (38, 20))
+        if not is_editing:
+            # 1. HEADER
+            draw_rounded_rect(screen, (13, 15, 18), pygame.Rect(12, 10, 616, 36), radius=6, border_col=(30, 36, 44), border_w=1)
 
-        alarm_card_rect = pygame.Rect(210, 15, 220, 26)
-        if is_alarm_ringing and (int(time.time() * 4) % 2 == 0):
-            draw_rounded_rect(screen, (153, 27, 27), alarm_card_rect, radius=4, border_col=(239, 68, 68), border_w=1)
+            # Card Alarme
+            alarm_card_w = 230
+            alarm_card_x = (SCREEN_WIDTH - alarm_card_w) // 2
+            a_rect = pygame.Rect(alarm_card_x, 15, alarm_card_w, 26)
+            if is_alarm_ringing and (int(time.time() * 4) % 2 == 0):
+                draw_rounded_rect(screen, (153, 27, 27), a_rect, radius=4, border_col=(239, 68, 68), border_w=1)
+            else:
+                draw_rounded_rect(screen, (23, 23, 23), a_rect, radius=4, border_col=(38, 38, 38), border_w=1)
+
+            pygame.draw.circle(screen, (251, 191, 36), (alarm_card_x + 18, 28), 5, width=1)
+            screen.blit(f_header.render("ALARME:", True, (209, 213, 219)), (alarm_card_x + 28, 21))
+            screen.blit(f_header.render(f"{config.alarm_hour:02d}:{config.alarm_minute:02d}", True, (251, 191, 36)), (alarm_card_x + 84, 21))
+
+            b_txt = "ATIVO" if config.alarm_active else "SILENCIADO"
+            b_bg = (6, 78, 59) if config.alarm_active else (38, 38, 38)
+            b_border = (6, 95, 70) if config.alarm_active else (64, 64, 64)
+            b_fg = (52, 211, 153) if config.alarm_active else (156, 163, 175)
+            b_surf = f_badge.render(b_txt, True, b_fg)
+            bw = b_surf.get_width() + 10
+            draw_rounded_rect(screen, b_bg, pygame.Rect(alarm_card_x + 138, 18, bw, 20), radius=3, border_col=b_border, border_w=1)
+            screen.blit(b_surf, (alarm_card_x + 143, 22))
+
+            # Bateria
+            screen.blit(f_header.render(f"{battery_pct}%", True, (156, 163, 175)), (570, 21))
+            pygame.draw.rect(screen, (100, 116, 139), pygame.Rect(606, 23, 18, 10), width=1)
+            pygame.draw.line(screen, (100, 116, 139), (624, 26), (624, 30), 2)
+            charge_w = max(1, int(16 * (battery_pct / 100.0)))
+            charge_col = (16, 185, 129) if battery_pct > 20 else (239, 68, 68)
+            pygame.draw.rect(screen, charge_col, (607, 24, charge_w, 8))
+
+            # 2. DATA
+            dia_semana = DIAS_SEMANA[now.weekday()]
+            date_str = f"{dia_semana}, {now.day:02d} {MESES[now.month - 1]} {now.year}"
+            d_surf = f_date.render(date_str, True, (156, 163, 175))
+            screen.blit(d_surf, d_surf.get_rect(center=(SCREEN_WIDTH // 2, 118)))
+
+            # 3. RELÓGIO PRINCIPAL
+            h_str = f"{now.hour:02d}"
+            m_str = f"{now.minute:02d}"
+            s_str = f"{now.second:02d}"
+            colon_char = ":" if (int(time.time() * 2) % 2 == 0) else " "
+
+            h_surf = f_time.render(h_str, True, theme_col)
+            c1_surf = f_colon.render(colon_char, True, theme_col)
+            m_surf = f_time.render(m_str, True, theme_col)
+            c2_surf = f_colon.render(colon_char, True, theme_col)
+            s_surf = f_time.render(s_str, True, theme_col)
+
+            total_w = (h_surf.get_width() + c1_surf.get_width() +
+                       m_surf.get_width() + c2_surf.get_width() +
+                       s_surf.get_width() + 16)
+            start_x = (SCREEN_WIDTH - total_w) // 2
+            base_y = 158
+
+            screen.blit(h_surf, (start_x, base_y))
+            cur_x = start_x + h_surf.get_width() + 4
+            screen.blit(c1_surf, (cur_x, base_y + 4))
+            cur_x += c1_surf.get_width() + 4
+            screen.blit(m_surf, (cur_x, base_y))
+            cur_x += m_surf.get_width() + 4
+            screen.blit(c2_surf, (cur_x, base_y + 4))
+            cur_x += c2_surf.get_width() + 4
+            screen.blit(s_surf, (cur_x, base_y))
+
+            # 4. TOAST
+            t_msg = toast_msg if time.time() <= toast_timer else "MODO NORMAL • SELECIONE OS BOTÕES DE AÇÃO"
+            t_surf = f_toast.render(t_msg, True, (209, 213, 219))
+            tw = t_surf.get_width() + 28
+            tx = (SCREEN_WIDTH - tw) // 2
+            draw_rounded_rect(screen, (20, 22, 25), pygame.Rect(tx, 305, tw, 24), radius=12, border_col=(38, 45, 56), border_w=1)
+            pygame.draw.circle(screen, theme_col, (tx + 12, 317), 3)
+            screen.blit(t_surf, (tx + 22, 310))
+
+            # 5. RODAPÉ
+            draw_rounded_rect(screen, (10, 12, 15), pygame.Rect(12, 412, 616, 56), radius=8, border_col=(30, 36, 44), border_w=1)
+            lbl = f_bottom.render("TECLAS: [A] Editar • [B] Silenciar • [L1/R1] Trocar Cor • [SELECT+START] Sair", True, (203, 213, 225))
+            screen.blit(lbl, lbl.get_rect(center=(SCREEN_WIDTH // 2, 440)))
+
         else:
-            draw_rounded_rect(screen, (23, 23, 23), alarm_card_rect, radius=4, border_col=(38, 38, 38), border_w=1)
+            # TELA DE AJUSTE DE ALARME
+            draw_rounded_rect(screen, (13, 15, 18), pygame.Rect(12, 10, 616, 36), radius=6, border_col=(30, 36, 44), border_w=1)
+            screen.blit(f_header.render(f"{battery_pct}%", True, (156, 163, 175)), (570, 21))
+            pygame.draw.rect(screen, (100, 116, 139), pygame.Rect(606, 23, 18, 10), width=1)
+            pygame.draw.line(screen, (100, 116, 139), (624, 26), (624, 30), 2)
+            charge_w = max(1, int(16 * (battery_pct / 100.0)))
+            charge_col = (16, 185, 129) if battery_pct > 20 else (239, 68, 68)
+            pygame.draw.rect(screen, charge_col, (607, 24, charge_w, 8))
 
-        pygame.draw.circle(screen, (251, 191, 36), (222, 28), 5, width=1)
-        pygame.draw.line(screen, (251, 191, 36), (222, 28), (222, 25), 1)
-        pygame.draw.line(screen, (251, 191, 36), (222, 28), (225, 28), 1)
-        screen.blit(f_header.render("ALARME:", True, (209, 213, 219)), (234, 21))
-        screen.blit(f_header.render(f"{config.alarm_hour:02d}:{config.alarm_minute:02d}", True, (251, 191, 36)), (290, 21))
+            t_title = f_modal_title.render("DEFINIR HORÁRIO DE ALARME", True, (156, 163, 175))
+            screen.blit(t_title, t_title.get_rect(center=(SCREEN_WIDTH // 2, 75)))
 
-        b_txt = "ATIVO" if config.alarm_active else "SILENCIADO"
-        b_bg = (6, 78, 59) if config.alarm_active else (38, 38, 38)
-        b_border = (6, 95, 70) if config.alarm_active else (64, 64, 64)
-        b_fg = (52, 211, 153) if config.alarm_active else (156, 163, 175)
-        b_surf = f_badge.render(b_txt, True, b_fg)
-        bw = b_surf.get_width() + 10
-        draw_rounded_rect(screen, b_bg, pygame.Rect(340, 18, bw, 20), radius=3, border_col=b_border, border_w=1)
-        screen.blit(b_surf, (345, 21))
-
-        screen.blit(f_header.render(theme["name"], True, theme_col), (490, 21))
-        screen.blit(f_header.render(f"{battery_pct}%", True, (156, 163, 175)), (570, 21))
-        pygame.draw.rect(screen, (100, 116, 139), pygame.Rect(606, 23, 18, 10), width=1)
-        pygame.draw.line(screen, (100, 116, 139), (624, 26), (624, 30), 2)
-        charge_w = max(1, int(16 * (battery_pct / 100.0)))
-        charge_col = (16, 185, 129) if battery_pct > 20 else (239, 68, 68)
-        pygame.draw.rect(screen, charge_col, (607, 24, charge_w, 8))
-
-        # 2. DATA E RELÓGIO
-        dia_semana = DIAS_SEMANA[now.weekday()]
-        date_str = f"{dia_semana}, {now.day:02d} {MESES[now.month - 1]} {now.year}"
-        d_surf = f_date.render(date_str, True, (156, 163, 175))
-        screen.blit(d_surf, d_surf.get_rect(center=(SCREEN_WIDTH // 2, 115)))
-
-        h_str = f"{now.hour:02d}"
-        m_str = f"{now.minute:02d}"
-        s_str = f"{now.second:02d}"
-        colon_char = ":" if (int(time.time() * 2) % 2 == 0) else " "
-
-        h_surf = f_time.render(h_str, True, theme_col)
-        c1_surf = f_colon.render(colon_char, True, theme_col)
-        m_surf = f_time.render(m_str, True, theme_col)
-        c2_surf = f_colon.render(colon_char, True, theme_col)
-        s_surf = f_time.render(s_str, True, theme_col)
-        ampm_surf = f_date.render("24H", True, (156, 163, 175))
-
-        total_w = (h_surf.get_width() + c1_surf.get_width() +
-                   m_surf.get_width() + c2_surf.get_width() +
-                   s_surf.get_width() + ampm_surf.get_width() + 18)
-        start_x = (SCREEN_WIDTH - total_w) // 2
-        base_y = 150
-
-        screen.blit(h_surf, (start_x, base_y))
-        cur_x = start_x + h_surf.get_width() + 4
-        screen.blit(c1_surf, (cur_x, base_y + 4))
-        cur_x += c1_surf.get_width() + 4
-        screen.blit(m_surf, (cur_x, base_y))
-        cur_x += m_surf.get_width() + 4
-        screen.blit(c2_surf, (cur_x, base_y + 4))
-        cur_x += c2_surf.get_width() + 4
-        screen.blit(s_surf, (cur_x, base_y))
-        cur_x += s_surf.get_width() + 10
-        screen.blit(ampm_surf, (cur_x, base_y + 60))
-
-        # Toast
-        t_msg = toast_msg if time.time() <= toast_timer else "MODO NORMAL • SELECIONE OS BOTÕES DE AÇÃO"
-        t_surf = f_toast.render(t_msg, True, (209, 213, 219))
-        tw = t_surf.get_width() + 28
-        tx = (SCREEN_WIDTH - tw) // 2
-        draw_rounded_rect(screen, (20, 22, 25), pygame.Rect(tx, 280, tw, 24), radius=12, border_col=(38, 45, 56), border_w=1)
-        pygame.draw.circle(screen, theme_col, (tx + 12, 292), 3)
-        screen.blit(t_surf, (tx + 22, 285))
-
-        # 3. MODAL DE EDIÇÃO
-        if is_editing:
-            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 220))
-            screen.blit(overlay, (0, 0))
-
-            modal_w, modal_h = 470, 270
-            m_rect = pygame.Rect((SCREEN_WIDTH - modal_w) // 2, (SCREEN_HEIGHT - modal_h) // 2 - 10, modal_w, modal_h)
-            draw_rounded_rect(screen, (10, 12, 16), m_rect, radius=10, border_col=(45, 55, 72), border_w=2)
-
-            t_m = f_card_t.render("EDITAR HORA DO ALARME", True, (251, 191, 36))
-            screen.blit(t_m, t_m.get_rect(center=(SCREEN_WIDTH // 2, m_rect.y + 24)))
-            sub_m = f_bottom.render("Use DPAD Cima/Baixo para ajustar, Esquerda/Direita para alternar, A para salvar", True, (156, 163, 175))
-            screen.blit(sub_m, sub_m.get_rect(center=(SCREEN_WIDTH // 2, m_rect.y + 44)))
-            pygame.draw.line(screen, (38, 45, 56), (m_rect.x + 15, m_rect.y + 56), (m_rect.right - 15, m_rect.y + 56), 1)
-
-            box_w, box_h = 84, 60
-            center_y = m_rect.y + 120
+            box_w, box_h = 150, 138
 
             # Hora
-            h_r = pygame.Rect(SCREEN_WIDTH // 2 - 95, center_y - box_h // 2, box_w, box_h)
-            h_border = (251, 191, 36) if edit_field == 0 else (55, 65, 81)
-            h_bg = (23, 23, 23) if edit_field == 0 else (15, 17, 21)
-            draw_rounded_rect(screen, h_bg, h_r, radius=6, border_col=h_border, border_w=2 if edit_field == 0 else 1)
-            arr1 = f_card_t.render("▲", True, h_border)
-            screen.blit(arr1, arr1.get_rect(center=(h_r.centerx, h_r.top - 14)))
-            arr2 = f_card_t.render("▼", True, h_border)
-            screen.blit(arr2, arr2.get_rect(center=(h_r.centerx, h_r.bottom + 14)))
-            h_val = f_modal_val.render(f"{temp_hour:02d}", True, (251, 191, 36))
-            screen.blit(h_val, h_val.get_rect(center=h_r.center))
+            h_is_sel = (edit_field == 0)
+            arr1_col = (251, 191, 36) if h_is_sel else (82, 82, 82)
+            arr1 = f_modal_arrow.render("▲ +1H", True, arr1_col)
+            screen.blit(arr1, arr1.get_rect(center=(SCREEN_WIDTH // 2 - 110, 112)))
 
-            sep = f_modal_val.render(":", True, (251, 191, 36))
-            screen.blit(sep, sep.get_rect(center=(SCREEN_WIDTH // 2, center_y)))
+            h_r = pygame.Rect(SCREEN_WIDTH // 2 - 185, 126, box_w, box_h)
+            h_bg = (10, 10, 10) if h_is_sel else (13, 15, 18)
+            h_border = (251, 191, 36) if h_is_sel else (38, 38, 38)
+            draw_rounded_rect(screen, h_bg, h_r, radius=8, border_col=h_border, border_w=2 if h_is_sel else 1)
+
+            h_val = f_modal_val.render(f"{temp_hour:02d}", True, (251, 191, 36) if h_is_sel else (163, 163, 163))
+            screen.blit(h_val, h_val.get_rect(center=(h_r.centerx, h_r.centery - 10)))
+
+            if h_is_sel:
+                draw_rounded_rect(screen, (69, 26, 3), pygame.Rect(h_r.centerx - 60, h_r.bottom - 26, 120, 18), radius=4, border_col=(120, 53, 15), border_w=1)
+                b_lbl = f_modal_badge.render("HORA [SELECIONADO]", True, (253, 230, 138))
+            else:
+                b_lbl = f_modal_badge.render("HORA", True, (115, 115, 115))
+            screen.blit(b_lbl, b_lbl.get_rect(center=(h_r.centerx, h_r.bottom - 17)))
+
+            arr2 = f_modal_arrow.render("▼ -1H", True, arr1_col)
+            screen.blit(arr2, arr2.get_rect(center=(SCREEN_WIDTH // 2 - 110, 280)))
+
+            # Dois pontos
+            sep = f_modal_colon.render(":", True, (115, 115, 115))
+            screen.blit(sep, sep.get_rect(center=(SCREEN_WIDTH // 2, 195)))
 
             # Minuto
-            m_r = pygame.Rect(SCREEN_WIDTH // 2 + 11, center_y - box_h // 2, box_w, box_h)
-            m_border = (251, 191, 36) if edit_field == 1 else (55, 65, 81)
-            m_bg = (23, 23, 23) if edit_field == 1 else (15, 17, 21)
-            draw_rounded_rect(screen, m_bg, m_r, radius=6, border_col=m_border, border_w=2 if edit_field == 1 else 1)
-            arr3 = f_card_t.render("▲", True, m_border)
-            screen.blit(arr3, arr3.get_rect(center=(m_r.centerx, m_r.top - 14)))
-            arr4 = f_card_t.render("▼", True, m_border)
-            screen.blit(arr4, arr4.get_rect(center=(m_r.centerx, m_r.bottom + 14)))
-            m_val = f_modal_val.render(f"{temp_minute:02d}", True, (251, 191, 36))
-            screen.blit(m_val, m_val.get_rect(center=m_r.center))
+            m_is_sel = (edit_field == 1)
+            arr3_col = (251, 191, 36) if m_is_sel else (82, 82, 82)
+            arr3 = f_modal_arrow.render("▲ +1M", True, arr3_col)
+            screen.blit(arr3, arr3.get_rect(center=(SCREEN_WIDTH // 2 + 110, 112)))
 
-            btn1 = pygame.Rect(m_rect.centerx - 170, m_rect.bottom - 45, 160, 30)
-            draw_rounded_rect(screen, (35, 25, 10), btn1, radius=5, border_col=(245, 158, 11), border_w=1)
-            draw_badge_btn(screen, "A", btn1.x + 20, btn1.centery, (185, 28, 28), (248, 113, 113))
-            save_txt = f_card_t.render("SALVAR & FECHAR", True, (253, 230, 138))
-            screen.blit(save_txt, (btn1.x + 36, btn1.centery - save_txt.get_height() // 2))
+            m_r = pygame.Rect(SCREEN_WIDTH // 2 + 35, 126, box_w, box_h)
+            m_bg = (10, 10, 10) if m_is_sel else (13, 15, 18)
+            m_border = (251, 191, 36) if m_is_sel else (38, 38, 38)
+            draw_rounded_rect(screen, m_bg, m_r, radius=8, border_col=m_border, border_w=2 if m_is_sel else 1)
 
-            btn2 = pygame.Rect(m_rect.centerx + 10, m_rect.bottom - 45, 160, 30)
-            draw_rounded_rect(screen, (23, 23, 23), btn2, radius=5, border_col=(75, 85, 99), border_w=1)
-            draw_badge_btn(screen, "B", btn2.x + 20, btn2.centery, (161, 98, 7), (253, 224, 71), (0, 0, 0))
-            can_txt = f_card_t.render("CANCELAR", True, (156, 163, 175))
-            screen.blit(can_txt, (btn2.x + 38, btn2.centery - can_txt.get_height() // 2))
+            m_val = f_modal_val.render(f"{temp_minute:02d}", True, (251, 191, 36) if m_is_sel else (163, 163, 163))
+            screen.blit(m_val, m_val.get_rect(center=(m_r.centerx, m_r.centery - 10)))
 
-        # 4. RODAPÉ
-        footer_rect = pygame.Rect(12, 385, 616, 85)
-        draw_rounded_rect(screen, (10, 12, 15), footer_rect, radius=8, border_col=(30, 36, 44), border_w=1)
-        col_w = 196
+            if m_is_sel:
+                draw_rounded_rect(screen, (69, 26, 3), pygame.Rect(m_r.centerx - 65, m_r.bottom - 26, 130, 18), radius=4, border_col=(120, 53, 15), border_w=1)
+                b_lbl2 = f_modal_badge.render("MINUTO [SELECIONADO]", True, (253, 230, 138))
+            else:
+                b_lbl2 = f_modal_badge.render("MINUTO", True, (115, 115, 115))
+            screen.blit(b_lbl2, b_lbl2.get_rect(center=(m_r.centerx, m_r.bottom - 17)))
 
-        c1 = pygame.Rect(footer_rect.x + 8, footer_rect.y + 8, col_w, 46)
-        draw_rounded_rect(screen, (20, 22, 26), c1, radius=6, border_col=(38, 45, 56), border_w=1)
-        draw_badge_btn(screen, "A", c1.x + 22, c1.centery, (185, 28, 28), (248, 113, 113))
-        screen.blit(f_card_t.render("EDITAR ALARME", True, (229, 231, 235)), (c1.x + 42, c1.y + 8))
-        screen.blit(f_card_s.render("Configurar horário", True, (156, 163, 175)), (c1.x + 42, c1.y + 24))
+            arr4 = f_modal_arrow.render("▼ -1M", True, arr3_col)
+            screen.blit(arr4, arr4.get_rect(center=(SCREEN_WIDTH // 2 + 110, 280)))
 
-        c2 = pygame.Rect(footer_rect.x + 8 + col_w + 8, footer_rect.y + 8, col_w, 46)
-        draw_rounded_rect(screen, (20, 22, 26), c2, radius=6, border_col=(38, 45, 56), border_w=1)
-        draw_badge_btn(screen, "B", c2.x + 22, c2.centery, (161, 98, 7), (253, 224, 71), (0, 0, 0))
-        screen.blit(f_card_t.render("SILENCIAR / MUDAR", True, (229, 231, 235)), (c2.x + 42, c2.y + 8))
-        screen.blit(f_card_s.render("Desliga ou silencia", True, (156, 163, 175)), (c2.x + 42, c2.y + 24))
+            # Card Status do Alarme
+            status_box_w = 430
+            status_box_x = (SCREEN_WIDTH - status_box_w) // 2
+            st_rect = pygame.Rect(status_box_x, 316, status_box_w, 42)
+            draw_rounded_rect(screen, (20, 23, 28), st_rect, radius=6, border_col=(38, 45, 56), border_w=1)
+            screen.blit(f_badge.render("STATUS DO ALARME:", True, (212, 212, 212)), (status_box_x + 16, 330))
 
-        c3 = pygame.Rect(footer_rect.x + 8 + (col_w + 8) * 2, footer_rect.y + 8, col_w, 46)
-        draw_rounded_rect(screen, (20, 22, 26), c3, radius=6, border_col=(38, 45, 56), border_w=1)
-        draw_badge_btn(screen, "L1", c3.x + 18, c3.centery, (51, 65, 85), (100, 116, 139))
-        draw_badge_btn(screen, "R1", c3.x + 46, c3.centery, (51, 65, 85), (100, 116, 139))
-        screen.blit(f_card_t.render("COR DA FONTE", True, (229, 231, 235)), (c3.x + 68, c3.y + 8))
-        screen.blit(f_card_s.render("Alternar paleta", True, (156, 163, 175)), (c3.x + 68, c3.y + 24))
+            # Badge ATIVO
+            act_bg = (6, 78, 59) if temp_active else (23, 23, 23)
+            act_border = (16, 185, 129) if temp_active else (38, 38, 38)
+            act_fg = (52, 211, 153) if temp_active else (82, 82, 82)
+            draw_rounded_rect(screen, act_bg, pygame.Rect(status_box_x + 165, 324, 70, 26), radius=4, border_col=act_border, border_w=1)
+            if temp_active:
+                pygame.draw.circle(screen, (52, 211, 153), (status_box_x + 176, 337), 3)
+                screen.blit(f_badge.render("ATIVO", True, act_fg), (status_box_x + 185, 330))
+            else:
+                screen.blit(f_badge.render("ATIVO", True, act_fg), (status_box_x + 180, 330))
 
-        pygame.draw.line(screen, (28, 32, 40), (footer_rect.x + 10, footer_rect.y + 60), (footer_rect.right - 10, footer_rect.y + 60), 1)
-        screen.blit(f_bottom.render("LAYOUT R36S • 640 × 480 IPS", True, (100, 116, 139)), (footer_rect.x + 12, footer_rect.y + 67))
-        lbl_k = f_bottom.render("[A] Editar • [B] Silenciar • [L1/R1] Trocar Cor • [SELECT+START] Sair", True, (148, 163, 184))
-        screen.blit(lbl_k, (footer_rect.right - lbl_k.get_width() - 12, footer_rect.y + 67))
+            # Badge INATIVO
+            inact_bg = (38, 38, 38) if not temp_active else (23, 23, 23)
+            inact_border = (82, 82, 82) if not temp_active else (38, 38, 38)
+            inact_fg = (212, 212, 212) if not temp_active else (82, 82, 82)
+            draw_rounded_rect(screen, inact_bg, pygame.Rect(status_box_x + 242, 324, 75, 26), radius=4, border_col=inact_border, border_w=1)
+            screen.blit(f_badge.render("INATIVO", True, inact_fg), (status_box_x + 256, 330))
+
+            screen.blit(f_badge.render("[X / Y: Alternar]", True, (115, 115, 115)), (status_box_x + 325, 330))
+
+            # Rodapé Modo Ajuste
+            draw_rounded_rect(screen, (10, 12, 15), pygame.Rect(12, 412, 616, 56), radius=8, border_col=(30, 36, 44), border_w=1)
+            lbl = f_bottom.render("TECLAS: [D-PAD] Ajustar / Navegar • [A] Confirmar • [B] Cancelar", True, (203, 213, 225))
+            screen.blit(lbl, lbl.get_rect(center=(SCREEN_WIDTH // 2, 440)))
 
         pygame.display.flip()
         clock.tick(30)

@@ -1,6 +1,6 @@
 # Relógio Despertador Digital para R36S (Ports)
 
-Um relógio despertador digital com visual retrô e estética cyberpunk, desenvolvido sob medida para o console portátil **R36S** (ArkOS / AmberELEC / TheRA), na resolução nativa de **640x480** pixels.
+Um relógio despertador digital com visual retrô, desenvolvido sob medida para o console portátil **R36S** (ArkOS / AmberELEC / TheRA), na resolução nativa de **640x480** pixels.
 
 ---
 
@@ -8,11 +8,12 @@ Um relógio despertador digital com visual retrô e estética cyberpunk, desenvo
 
 | Botão | Função no Modo Normal | Função no Modo de Edição |
 | :--- | :--- | :--- |
-| **A** | Abre o painel de **Edição do Alarme** | **Salvar e Fechar** as alterações |
+| **A** | Abre o painel de **Edição do Alarme** | **Salvar e Confirmar** alterações |
 | **B** | **Silencia/Ativa** o alarme (ou para o bipe) | **Cancelar** e fechar sem salvar |
-| **D-Pad Cima / Baixo** | - | Ajusta a **Hora** (00-23) ou **Minuto** (00-59) |
-| **D-Pad Esquerda / Direita** | - | Alterna entre o campo de **Hora** e **Minuto** |
-| **L1 / R1** | Alterna a **Cor da Fonte** (todas as 6 paletas) | Alterna a **Cor da Fonte** |
+| **X ou Y** | - | Alterna status do alarme (**ATIVO** / **INATIVO**) |
+| **D-Pad Cima / Baixo** | - | Ajusta a **Hora** (+1H/-1H) ou **Minuto** (+1M/-1M) |
+| **D-Pad Esquerda / Direita** | - | Alterna seleção entre **Hora** e **Minuto** |
+| **L1 / R1** | Alterna a **Cor da Fonte** (6 paletas) | Alterna a **Cor da Fonte** |
 | **SELECT + START** | **Sair** do aplicativo e retornar ao menu | Fecha o aplicativo |
 
 ### 🎨 Paletas de Cores Disponíveis (L1 / R1):
@@ -66,6 +67,7 @@ Um relógio despertador digital com visual retrô e estética cyberpunk, desenvo
 Caso deseje remover o relógio:
 1. No menu **PORTS** do R36S, selecione e execute o script **`Desinstalar Relogio`**.
 2. O script removerá automaticamente o executável `Relogio.sh`, os arquivos da pasta `relogio/` e a si próprio, deixando seu console limpo.
+
 
 ---
 >**AI sloped with subsidized tokens and love. 🤖💛**
