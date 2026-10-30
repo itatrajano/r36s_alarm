@@ -66,3 +66,6 @@ Um relógio despertador digital com visual retrô e estética cyberpunk, desenvo
 Caso deseje remover o relógio:
 1. No menu **PORTS** do R36S, selecione e execute o script **`Desinstalar Relogio`**.
 2. O script removerá automaticamente o executável `Relogio.sh`, os arquivos da pasta `relogio/` e a si próprio, deixando seu console limpo.
+
+---
+>**AI sloped with subsidized tokens and love. 🤖💛**
